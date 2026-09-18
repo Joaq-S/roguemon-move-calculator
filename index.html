@@ -177,6 +177,7 @@ td .chip{font-size:10px;padding:3px 5px;margin-right:3px}
           </div>
         </div>
         <div class="scroll"><table><thead><tr><th>Pokémon</th><th>Type</th><th>Best move</th><th class="num">×</th><th class="num">Power</th></tr></thead><tbody id="rows"></tbody></table></div>
+        <div class="actions"><button class="btn" type="button" id="more" hidden>Show all</button></div>
       </section>
     </main>
   </div>
@@ -250,6 +251,7 @@ function state(){
 }
 function mult(move,mon){return (move.crit?2:1)*(mon&&mon.types.includes(move.type)?1.5:1)}
 
+let lastKey=null;
 function render(){
   const {mon,moves}=state();
   // attacker meta
@@ -263,6 +265,9 @@ function render(){
     } else meta.innerHTML=el.value.trim()&&!typing?'<span class="hint">Not a damaging move with fixed power.</span>':'';
   });
   const active=moves.filter(Boolean);
+  const key=(mon?mon.name:'')+'|'+moves.map(m=>m?m.name:'').join('|');
+  if(key===lastKey)return;
+  lastKey=key;
   writeHash();
   const results=MONS.map(p=>{
     let best=null,bp=-1,be=0;
@@ -274,7 +279,7 @@ function render(){
     document.getElementById('t-hi-p').textContent=document.getElementById('t-lo-p').textContent='of Pokémon';
     document.getElementById('chart').innerHTML='<div class="empty">Add a move to see results.</div>';
     document.getElementById('usage').innerHTML=document.getElementById('walls').innerHTML='<div class="empty">No moves yet.</div>';
-    document.getElementById('rows').innerHTML='';lastResults=[];
+    document.getElementById('rows').innerHTML='';lastResults=[];document.getElementById('more').hidden=true;
     return;
   }
   const vals=results.map(r=>r.power).sort((a,b)=>a-b);
@@ -307,9 +312,12 @@ function renderRows(results){
   if(sortMode==='asc')rs.sort((a,b)=>a.power-b.power||a.p.dex-b.p.dex);
   else if(sortMode==='desc')rs.sort((a,b)=>b.power-a.power||a.p.dex-b.p.dex);
   else rs.sort((a,b)=>a.p.dex-b.p.dex);
+  const total=rs.length;if(!showAll)rs=rs.slice(0,ROW_CAP);
   document.getElementById('rows').innerHTML=rs.length?rs.map(r=>`<tr><td>${esc(r.p.name)}</td><td>${r.p.types.map(chip).join('')}</td><td>${esc(r.best.name)}</td><td class="num x">${r.e}</td><td class="num pw ${cls(r.power)}">${fmt(r.power)}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">No Pokémon match that filter.</td></tr>';
   lastResults=results;
+  const more=document.getElementById('more');more.hidden=showAll||total<=ROW_CAP;more.textContent='Show all '+total+' Pokémon';
 }
+const ROW_CAP=100;let showAll=false;
 let lastResults=[];
 
 function drawChart(vals){
@@ -405,12 +413,14 @@ document.getElementById('copy').addEventListener('click',async e=>{
   const b=e.currentTarget;try{await navigator.clipboard.writeText(location.href);b.textContent='Link copied'}catch(_){b.textContent='Copy the URL from the address bar'}
   setTimeout(()=>b.textContent='Copy share link',1800);
 });
-document.getElementById('filter').addEventListener('input',()=>renderRows(lastResults));
+let filterTimer;
+document.getElementById('filter').addEventListener('input',()=>{clearTimeout(filterTimer);filterTimer=setTimeout(()=>renderRows(lastResults),100)});
+document.getElementById('more').addEventListener('click',()=>{showAll=true;renderRows(lastResults)});
 document.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{
   sortMode=b.dataset.sort;document.querySelectorAll('[data-sort]').forEach(x=>x.setAttribute('aria-pressed',x===b));renderRows(lastResults);
 }));
-window.addEventListener('hashchange',()=>{readHash();render()});
-matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',render);
+window.addEventListener('hashchange',()=>{readHash();lastKey=null;render()});
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{lastKey=null;render()});
 render();
 })();
 </script>

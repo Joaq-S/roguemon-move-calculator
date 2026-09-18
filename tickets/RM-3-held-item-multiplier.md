@@ -25,13 +25,13 @@ multiplier to qualifying moves, e.g. Silk Scarf boosts Normal-type moves.
 - Item data is pulled from pokemondb.net into `data/items.txt`, and `build_data.py` adds it
   to `data.js`.
 
-## Open questions (need answers before starting)
-1. **Multiplier by generation:** type-boosting items are ×1.2 from Gen 4 onward but ×1.1 in
-   Gen 3. Roguemon runs on FireRed/LeafGreen. Should we use ×1.1 (Gen 3) or ×1.2 (current)?
-2. **Which extras** from the "Possible extras" list, if any, should be included?
+## Decisions (from Jason)
+- Use **Gen 9 mechanics** for items, type chart and moves, including Fairy. The one exception is
+  the calculator's own rule that always-crit moves count as ×2.
+- So type-boosting items and Plates are **×1.2**, as are the incenses.
+- Still to confirm when the ticket starts: which of the "Possible extras" to include.
 
 ## Acceptance criteria
-- [ ] Choosing Silk Scarf with a Normal move raises that move's effective power by the agreed
-      multiplier. Moves of other types don't change.
+- [ ] Choosing Silk Scarf with a Normal move raises that move's effective power by the ×1.2. Moves of other types don't change.
 - [ ] "No item" gives the same numbers as today.
 - [ ] Opening a share link restores the chosen item.
