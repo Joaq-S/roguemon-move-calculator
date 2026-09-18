@@ -20,6 +20,13 @@ Thousand Arrows (hits Flying types). Not counted: abilities, items, weather, and
 with variable or fixed damage (Low Kick, Seismic Toss, etc.). Alternate forms are listed
 once per distinct typing.
 
+## Evaluate a new move
+
+Pick a move you're being offered, and the page tries it in place of each current move (or in an
+empty slot). It recommends whether to teach it and which move to forget, with the reasons and a
+comparison table. Swaps are ranked by a score you can adjust:
+`1 × average + 0.5 × median + 0.5 × %≥120 − 2 × %<60`.
+
 ## Files
 
 | File | What it is |

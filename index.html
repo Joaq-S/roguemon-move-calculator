@@ -75,6 +75,28 @@ input[type=text].invalid{border-color:var(--bad);background:var(--bad-bg)}
 .tag.crit{border-color:var(--bad);color:var(--bad)}
 .tag.item{border-color:var(--good);color:var(--good)}
 .tag.hits{border-color:var(--ink);font-weight:500}
+.eval-top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-start;margin-bottom:14px}
+.eval-field{flex:1 1 260px;max-width:380px}
+.weights{flex:1 1 260px;font-size:13px}
+.weights summary{cursor:pointer;color:var(--muted);font-weight:500;padding-block:4px}
+.weights summary:focus-visible{outline:2px solid var(--accent)}
+.wgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+.wgrid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.wgrid input{font:14px var(--mono);color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%}
+.wgrid input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.verdict{border-radius:8px;padding:14px 16px;margin-bottom:14px;border:1px solid var(--line);background:var(--sunk)}
+.verdict.yes{border-color:var(--good);background:var(--good-bg)}
+.verdict.no{border-color:var(--bad);background:var(--bad-bg)}
+.verdict .vt{font:600 20px/1.2 var(--display);margin-bottom:6px}
+.verdict.yes .vt{color:var(--good)} .verdict.no .vt{color:var(--bad)}
+.verdict p{margin:0 0 10px;max-width:75ch}
+.verdict .why{margin:0 0 12px;padding-left:18px;max-width:78ch;display:grid;gap:4px}
+.verdict p:last-child{margin-bottom:0}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+table.cmp td .chip{font-size:10px;padding:3px 5px}
+table.cmp tr.rec td{background:var(--good-bg);font-weight:500}
+.dl{font-size:11px;margin-left:4px;color:var(--muted)}
+.dl.up{color:var(--good)} .dl.down{color:var(--bad)}
 .hint{font-size:12px;color:var(--bad)}
 .note{font-size:12px;color:var(--muted);margin:16px 0 0;line-height:1.5}
 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:24px}
@@ -158,6 +180,32 @@ td .chip{font-size:10px;padding:3px 5px;margin-right:3px}
         <div class="tile good"><div class="k">Power ≥ 120</div><div class="v" id="t-hi">–</div><div class="d" id="t-hi-p">of Pokémon</div></div>
         <div class="tile bad"><div class="k">Power &lt; 60</div><div class="v" id="t-lo">–</div><div class="d" id="t-lo-p">of Pokémon</div></div>
       </div>
+
+      <section class="panel section" id="eval-sec">
+        <h2>Evaluate a new move</h2>
+        <div class="eval-top">
+          <div class="field eval-field">
+            <label class="fld" for="newmv">Move you're being offered</label>
+            <div class="field">
+              <input type="text" id="newmv" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="newmv-list" autocomplete="off" spellcheck="false" placeholder="Search moves by name">
+              <button class="clear" type="button" data-clear="newmv" aria-label="Clear new move">×</button>
+              <ul class="sugg" id="newmv-list" role="listbox" aria-label="Matching moves" hidden></ul>
+            </div>
+          </div>
+          <details class="weights">
+            <summary>Scoring weights</summary>
+            <p class="note" style="margin:6px 0 10px">Score = <span class="x">A</span>×average + <span class="x">M</span>×median + <span class="x">H</span>×(% of Pokémon ≥120) − <span class="x">L</span>×(% under 60). The swap with the highest score wins.</p>
+            <div class="wgrid">
+              <label for="w-avg">A · average<input type="number" id="w-avg" min="0" step="0.1" value="1"></label>
+              <label for="w-med">M · median<input type="number" id="w-med" min="0" step="0.1" value="0.5"></label>
+              <label for="w-hi">H · % ≥120<input type="number" id="w-hi" min="0" step="0.1" value="0.5"></label>
+              <label for="w-lo">L · % under 60<input type="number" id="w-lo" min="0" step="0.1" value="2"></label>
+            </div>
+            <button class="btn" type="button" id="w-reset" style="margin-top:10px">Reset weights</button>
+          </details>
+        </div>
+        <div id="eval"></div>
+      </section>
 
       <section class="panel section">
         <h2>Distribution of best-move power</h2>
@@ -260,6 +308,7 @@ for(let i=0;i<4;i++){
 }
 const monIn=document.getElementById('mon');
 const itemIn=document.getElementById('item');
+const newIn=document.getElementById('newmv');
 const mvIn=[0,1,2,3].map(i=>document.getElementById('mv'+i));
 let sortMode='asc';
 
@@ -287,16 +336,33 @@ function render(){
       meta.innerHTML=chip(m.type)+`<span class="tag">${m.cat}</span><span class="tag">BP ${m.power}</span>`+(m.hits!==1?`<span class="tag hits" title="${esc(m.hitsLabel)}">×${+m.hits.toFixed(3)} · ${esc(m.hitsLabel)}</span>`:'')+(stab?'<span class="tag stab">STAB ×1.5</span>':'')+(m.crit?'<span class="tag crit">Always crits ×2</span>':'')+(item&&item.kind!=='super'&&itemMult(item,m,1)>1?`<span class="tag item">${esc(item.name)} ×${item.mult}</span>`:'')+(item&&item.kind==='super'?`<span class="tag item">${esc(item.name)} ×${item.mult} if super-effective</span>`:'')+`<span class="tag">= ${fmt(m.power*mult(m,mon)*itemMult(item,m,1))}</span>`;
     } else meta.innerHTML=el.value.trim()&&!typing?'<span class="hint">Not a damaging move with fixed power.</span>':'';
   });
-  const active=moves.filter(Boolean);
   const key=(mon?mon.name:'')+'|'+(item?item.name:'')+'|'+moves.map(m=>m?m.name:'').join('|');
-  if(key===lastKey)return;
-  lastKey=key;
+  const newMove=moveBy.get(newIn.value.trim().toLowerCase())||null;
+  const W=readWeights();
+  const ekey=key+'|'+(newMove?newMove.name:'')+'|'+(newIn.value.trim()&&document.activeElement!==newIn?newIn.value.trim():'')+'|'+W.join(',');
+  const mainChanged=key!==lastKey, evalChanged=ekey!==lastEKey;
+  if(!mainChanged&&!evalChanged)return;
   writeHash();
+  if(mainChanged){lastKey=key;cur=evaluate(moves,mon,item);renderMain(cur)}
+  if(evalChanged){lastEKey=ekey;renderEval(cur,moves,mon,item,newMove,W)}
+}
+let cur=null,lastEKey=null;
+// Best move per Pokémon for a loadout, plus the four summary stats.
+function evaluate(moves,mon,item){
+  const active=moves.filter(Boolean);
   const results=MONS.map(p=>{
-    let best=null,bp=-1,be=0;
+    let best=null,bp=active.length?-1:0,be=0;
     for(const m of active){const e=eff(m,p.types);const v=Math.round(m.power*mult(m,mon)*e*itemMult(item,m,e)*1000)/1000;if(v>bp){bp=v;best=m;be=e}}
-    return {p,best,power:active.length?bp:null,e:be};
+    return {p,best,power:bp,e:be};
   });
+  const vals=results.map(r=>r.power).sort((a,b)=>a-b);
+  const n=vals.length, avg=vals.reduce((a,b)=>a+b,0)/n;
+  const med=n%2?vals[(n-1)/2]:(vals[n/2-1]+vals[n/2])/2;
+  const hi=vals.filter(v=>v>=120).length, lo=vals.filter(v=>v<60).length;
+  return {active,results,vals,n,avg,med,hi,lo};
+}
+function renderMain(ev){
+  const {active,results,vals,n,avg,med,hi,lo}=ev;
   if(!active.length){
     ['t-avg','t-med','t-hi','t-lo'].forEach(id=>document.getElementById(id).textContent='–');
     document.getElementById('t-hi-p').textContent=document.getElementById('t-lo-p').textContent='of Pokémon';
@@ -305,10 +371,6 @@ function render(){
     document.getElementById('rows').innerHTML='';lastResults=[];document.getElementById('more').hidden=true;
     return;
   }
-  const vals=results.map(r=>r.power).sort((a,b)=>a-b);
-  const n=vals.length, avg=vals.reduce((a,b)=>a+b,0)/n;
-  const med=n%2?vals[(n-1)/2]:(vals[n/2-1]+vals[n/2])/2;
-  const hi=vals.filter(v=>v>=120).length, lo=vals.filter(v=>v<60).length;
   document.getElementById('t-avg').textContent=avg.toFixed(1);
   document.getElementById('t-med').textContent=fmt(med);
   document.getElementById('t-hi').textContent=hi;
@@ -327,6 +389,62 @@ function render(){
   document.getElementById('walls').innerHTML='<table><thead><tr><th>Pokémon</th><th>Best move</th><th class="num">Power</th></tr></thead><tbody>'+
     walls.map(r=>`<tr><td>${esc(r.p.name)}<div>${r.p.types.map(chip).join('')}</div></td><td>${esc(r.best.name)} <span class="x">×${r.e}</span></td><td class="num pw ${cls(r.power)}">${fmt(r.power)}</td></tr>`).join('')+'</tbody></table>';
   renderRows(results);
+}
+
+// ---- New Move evaluator (RM-5) ----
+const W_DEFAULT=[1,0.5,0.5,2]; // average, median, % ≥120, % <60 (subtracted)
+const wIn=['w-avg','w-med','w-hi','w-lo'].map(id=>document.getElementById(id));
+try{const saved=JSON.parse(localStorage.getItem('rm-weights')||'null');if(Array.isArray(saved)&&saved.length===4)saved.forEach((v,i)=>wIn[i].value=v)}catch(_){}
+function readWeights(){return wIn.map((el,i)=>{const v=parseFloat(el.value);return Number.isFinite(v)&&v>=0?v:W_DEFAULT[i]})}
+function score(ev,W){return W[0]*ev.avg+W[1]*ev.med+W[2]*100*ev.hi/ev.n-W[3]*100*ev.lo/ev.n}
+const signed=(d,dp=1)=>{const r=Math.round(d*10**dp)/10**dp;return (r>0?'+':r<0?'−':'±')+Math.abs(r).toFixed(dp)};
+function delta(d,goodIfUp,dp=1){const r=Math.round(d*10**dp)/10**dp;if(!r)return '<span class="dl">±0</span>';const good=goodIfUp?r>0:r<0;return `<span class="dl ${good?'up':'down'}">${signed(r,dp)}</span>`}
+function renderEval(curEv,moves,mon,item,nm,W){
+  const out=document.getElementById('eval');
+  const v=newIn.value.trim(), typing=document.activeElement===newIn;
+  newIn.classList.toggle('invalid',!typing&&!!v&&!nm);
+  if(!nm){out.innerHTML=v&&!typing?'<p class="hint">That isn\'t a damaging move with fixed power, so it can\'t be evaluated here.</p>':'<p class="note" style="margin:0">Pick a move you\'re being offered. The calculator tries it in place of each current move and recommends whether to teach it, and over which move.</p>';return}
+  if(moves.some(m=>m&&m.name===nm.name)){out.innerHTML=`<p class="note" style="margin:0">${esc(nm.name)} is already in your moves.</p>`;return}
+  const curScore=score(curEv,W);
+  const opts=[];let emptyDone=false;
+  moves.forEach((m,i)=>{
+    if(!m){if(emptyDone)return;emptyDone=true}
+    const next=moves.slice();next[i]=nm;
+    const ev=evaluate(next,mon,item);
+    opts.push({slot:i,old:m,ev,score:score(ev,W)});
+  });
+  opts.sort((a,b)=>b.score-a.score||a.slot-b.slot);
+  const best=opts[0], teach=best.score>curScore+1e-9;
+  const name=x=>`<b>${esc(x.name)}</b>`;
+  const statLine=(a,b)=>`average ${a.avg.toFixed(1)} → ${b.avg.toFixed(1)}, median ${fmt(a.med)} → ${fmt(b.med)}, ≥120 ${a.hi} → ${b.hi}, under 60 ${a.lo} → ${b.lo}`;
+  let verdict,reason=[];
+  const gainedBest=ev=>ev.results.filter(r=>r.best===nm).length;
+  const improved=ev=>ev.results.filter((r,k)=>r.power>curEv.results[k].power).length;
+  if(teach){
+    verdict=best.old?`Teach ${esc(nm.name)}, forget ${esc(best.old.name)}`:`Teach ${esc(nm.name)} into empty slot ${best.slot+1}`;
+    if(best.old){
+      const wasBest=curEv.results.filter(r=>r.best===best.old).length;
+      const lost=best.ev.results.filter((r,k)=>r.power<curEv.results[k].power).length;
+      reason.push(wasBest===0?`${name(best.old)} isn't your best move against any Pokémon, so forgetting it costs nothing.`:`${name(best.old)} is your best move against ${wasBest} Pokémon; `+(lost?`without it, ${lost} of them take less damage.`:`your other moves hit every one of them at least as hard, so forgetting it costs nothing.`));
+    } else reason.push(`Slot ${best.slot+1} is empty, so teaching it costs nothing.`);
+    reason.push(`${name(nm)} becomes your best move against ${gainedBest(best.ev)} Pokémon and hits ${improved(best.ev)} of them harder than before.`);
+    reason.push(`Overall: ${statLine(curEv,best.ev)}. Score ${curScore.toFixed(1)} → ${best.score.toFixed(1)}.`);
+    const second=opts[1];
+    if(second&&second.old)reason.push(`The next best option, forgetting ${esc(second.old.name)}, scores ${second.score.toFixed(1)}.`);
+  } else {
+    verdict=`Don't teach ${esc(nm.name)}`;
+    reason.push(`No swap improves your score (currently ${curScore.toFixed(1)}).`);
+    if(best.old)reason.push(Math.abs(best.score-curScore)<1e-9?`Forgetting ${name(best.old)} would leave your numbers unchanged, so there's nothing to gain.`:`The least bad option would be forgetting ${name(best.old)}: ${statLine(curEv,best.ev)}, score ${best.score.toFixed(1)}.`);
+    reason.push(`${name(nm)} would be your best move against at most ${Math.max(...opts.map(o=>gainedBest(o.ev)))} Pokémon.`);
+  }
+  const row=(label,ev,sc,cls,slot)=>`<tr class="${cls}"><td>${label}</td><td class="num">${ev.avg.toFixed(1)} ${ev===curEv?'':delta(ev.avg-curEv.avg,true)}</td><td class="num">${fmt(ev.med)} ${ev===curEv?'':delta(ev.med-curEv.med,true)}</td><td class="num">${ev.hi} ${ev===curEv?'':delta(ev.hi-curEv.hi,true,0)}</td><td class="num">${ev.lo} ${ev===curEv?'':delta(ev.lo-curEv.lo,false,0)}</td><td class="num"><b>${sc.toFixed(1)}</b> ${ev===curEv?'':delta(sc-curScore,true)}</td></tr>`;
+  out.innerHTML=`<div class="verdict ${teach?'yes':'no'}"><div class="vt">${verdict}</div><ul class="why">${reason.map(r=>'<li>'+r+'</li>').join('')}</ul>${teach?`<button class="btn primary" type="button" id="apply" data-slot="${best.slot}">Apply: put ${esc(nm.name)} in slot ${best.slot+1}</button>`:''}</div>
+  <div class="chart-wrap"><table class="cmp"><thead><tr><th>Option</th><th class="num">Average</th><th class="num">Median</th><th class="num">≥120</th><th class="num">&lt;60</th><th class="num">Score</th></tr></thead><tbody>`+
+    row('Keep current moves',curEv,curScore,!teach?'rec':'')+
+    opts.slice().sort((a,b)=>a.slot-b.slot).map(o=>row(o.old?`Forget ${chip(o.old.type)} ${esc(o.old.name)}`:`Fill empty slot ${o.slot+1}`,o.ev,o.score,teach&&o===best?'rec':'')).join('')+
+  `</tbody></table></div>`;
+  const ap=document.getElementById('apply');
+  if(ap)ap.addEventListener('click',()=>{mvIn[+ap.dataset.slot].value=nm.name;newIn.value='';render();document.getElementById('tiles').scrollIntoView({behavior:'smooth',block:'start'})});
 }
 function cls(v){return v>=120?'good':v<60?'bad':''}
 function renderRows(results){
@@ -377,6 +495,7 @@ function writeHash(){
   const p=new URLSearchParams();
   if(monIn.value.trim())p.set('mon',monIn.value.trim());
   if(itemIn.value.trim())p.set('item',itemIn.value.trim());
+  if(newIn.value.trim())p.set('new',newIn.value.trim());
   const mv=mvIn.map(e=>e.value.trim());
   if(mv.some(Boolean))p.set('moves',mv.join('|'));
   const h=p.toString();
@@ -384,7 +503,8 @@ function writeHash(){
 }
 function readHash(){
   const p=new URLSearchParams(location.hash.slice(1));
-  if(!p.has('mon')&&!p.has('moves')&&!p.has('item'))return false;
+  if(!p.has('mon')&&!p.has('moves')&&!p.has('item')&&!p.has('new'))return false;
+  newIn.value=p.get('new')||'';
   monIn.value=p.get('mon')||'';
   itemIn.value=p.get('item')||'';
   const mv=(p.get('moves')||'').split('|');
@@ -435,10 +555,14 @@ function makeCombo(el,{source,known,row,empty,showAllOnFocus}){
 }
 mvIn.forEach(el=>makeCombo(el,{source:MOVES,known:v=>moveBy.has(v.trim().toLowerCase()),empty:'No move with that name',
   row:m=>`${chip(m.type)}<span class="bp">${m.power} BP${m.hits!==1?' ×'+(+m.hits.toFixed(2)):''}</span>`}));
+makeCombo(newIn,{source:MOVES,known:v=>moveBy.has(v.trim().toLowerCase()),empty:'No move with that name',
+  row:m=>`${chip(m.type)}<span class="bp">${m.power} BP${m.hits!==1?' ×'+(+m.hits.toFixed(2)):''}</span>`});
+wIn.forEach(el=>el.addEventListener('input',()=>{try{localStorage.setItem('rm-weights',JSON.stringify(readWeights()))}catch(_){}render()}));
+document.getElementById('w-reset').addEventListener('click',()=>{wIn.forEach((el,i)=>el.value=W_DEFAULT[i]);try{localStorage.removeItem('rm-weights')}catch(_){}render()});
 makeCombo(itemIn,{source:ITEMS,known:v=>itemBy.has(v.trim().toLowerCase()),empty:'No power-boosting item with that name',showAllOnFocus:true,
   row:it=>`<span class="bp">${itemBoostLabel(it)}</span>`});
 document.querySelectorAll('[data-clear]').forEach(b=>b.addEventListener('click',()=>{const el=document.getElementById(b.dataset.clear);el.value='';el.focus();render()}));
-document.getElementById('reset').addEventListener('click',()=>{[monIn,itemIn,...mvIn].forEach(e=>e.value='');render();monIn.focus()});
+document.getElementById('reset').addEventListener('click',()=>{[monIn,itemIn,newIn,...mvIn].forEach(e=>e.value='');render();monIn.focus()});
 document.getElementById('copy').addEventListener('click',async e=>{
   const b=e.currentTarget;try{await navigator.clipboard.writeText(location.href);b.textContent='Link copied'}catch(_){b.textContent='Copy the URL from the address bar'}
   setTimeout(()=>b.textContent='Copy share link',1800);
@@ -449,7 +573,7 @@ document.getElementById('more').addEventListener('click',()=>{showAll=true;rende
 document.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{
   sortMode=b.dataset.sort;document.querySelectorAll('[data-sort]').forEach(x=>x.setAttribute('aria-pressed',x===b));renderRows(lastResults);
 }));
-window.addEventListener('hashchange',()=>{readHash();lastKey=null;render()});
+window.addEventListener('hashchange',()=>{readHash();lastKey=null;lastEKey=null;render()});
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{lastKey=null;render()});
 render();
 })();
