@@ -52,6 +52,15 @@ input[type=text]{width:100%;font:15px var(--body);color:var(--ink);background:va
 input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
 input[type=text].invalid{border-color:var(--bad);background:var(--bad-bg)}
 .field{position:relative}
+.sugg{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);margin:0;padding:4px;list-style:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:300px;overflow-y:auto}
+.sugg li{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:5px;cursor:pointer}
+.sugg li .nm{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sugg li .nm mark{background:none;color:var(--accent);font-weight:600}
+.sugg li .bp{font:12px var(--mono);color:var(--muted);min-width:44px;text-align:right}
+.sugg li .chip{font-size:10px;padding:3px 5px}
+.sugg li[aria-selected="true"],.sugg li:hover{background:var(--sunk)}
+.sugg li[aria-selected="true"]{outline:1px solid var(--accent)}
+.sugg .none{color:var(--muted);cursor:default;font-size:13px}
 .clear{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:6px 8px;border-radius:5px}
 .clear:hover{color:var(--ink);background:var(--line)}
 .clear:focus-visible{outline:2px solid var(--accent)}
@@ -173,7 +182,6 @@ td .chip{font-size:10px;padding:3px 5px;margin-right:3px}
   </div>
 </div>
 <datalist id="mon-list"></datalist>
-<datalist id="move-list"></datalist>
 <script src="data.js"></script>
 <script>
 (function(){
@@ -219,7 +227,6 @@ const moveBy=new Map(MOVES.map(m=>[m.name.toLowerCase(),m]));
 const monBy=new Map(MONS.map(m=>[m.name.toLowerCase(),m]));
 document.getElementById('counts').textContent=MOVES.length+' moves · '+MONS.length+' Pokémon';
 document.getElementById('mon-list').innerHTML=MONS.map(m=>`<option value="${esc(m.name)}">`).join('');
-document.getElementById('move-list').innerHTML=MOVES.map(m=>`<option value="${esc(m.name)}">${m.type} · ${m.power}${m.crit?' · always crits':''}</option>`).join('');
 
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 const chip=t=>`<span class="chip" style="background:${COLORS[t]}">${t}</span>`;
@@ -229,7 +236,7 @@ const fmt=n=>Number.isInteger(n)?String(n):n.toFixed(1);
 const movesEl=document.getElementById('moves');
 for(let i=0;i<4;i++){
   movesEl.insertAdjacentHTML('beforeend',`<div class="slot"><div class="slot-h"><label class="fld" for="mv${i}">Move ${i+1}</label></div>
-  <div class="field"><input type="text" id="mv${i}" list="move-list" autocomplete="off" spellcheck="false" placeholder="Search moves"><button class="clear" type="button" data-clear="mv${i}" aria-label="Clear move ${i+1}">×</button></div>
+  <div class="field"><input type="text" id="mv${i}" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="mv${i}-list" autocomplete="off" spellcheck="false" placeholder="Search moves by name"><button class="clear" type="button" data-clear="mv${i}" aria-label="Clear move ${i+1}">×</button><ul class="sugg" id="mv${i}-list" role="listbox" aria-label="Matching moves" hidden></ul></div>
   <div class="meta" id="mv${i}-meta"></div></div>`);
 }
 const monIn=document.getElementById('mon');
@@ -249,11 +256,11 @@ function render(){
   monIn.classList.toggle('invalid',!!monIn.value.trim()&&!mon);
   document.getElementById('mon-meta').innerHTML=mon?mon.types.map(chip).join('')+'<span>STAB on '+mon.types.join(' & ')+' moves</span>':(monIn.value.trim()?'<span class="hint">No Pokémon by that name. Pick one from the list.</span>':'<span>No attacker selected, so no STAB.</span>');
   mvIn.forEach((el,i)=>{
-    const m=moves[i];el.classList.toggle('invalid',!!el.value.trim()&&!m);
+    const m=moves[i];const typing=document.activeElement===el;el.classList.toggle('invalid',!typing&&!!el.value.trim()&&!m);
     const meta=document.getElementById('mv'+i+'-meta');
     if(m){const stab=mon&&mon.types.includes(m.type);
       meta.innerHTML=chip(m.type)+`<span class="tag">${m.cat}</span><span class="tag">BP ${m.power}</span>`+(stab?'<span class="tag stab">STAB ×1.5</span>':'')+(m.crit?'<span class="tag crit">Always crits ×2</span>':'')+`<span class="tag">= ${fmt(m.power*mult(m,mon))}</span>`;
-    } else meta.innerHTML=el.value.trim()?'<span class="hint">Not a damaging move with fixed power.</span>':'';
+    } else meta.innerHTML=el.value.trim()&&!typing?'<span class="hint">Not a damaging move with fixed power.</span>':'';
   });
   const active=moves.filter(Boolean);
   writeHash();
@@ -356,7 +363,42 @@ if(!readHash()){ // example loadout
   ['Thunderbolt','Iron Tail','Quick Attack','Brick Break'].forEach((m,i)=>mvIn[i].value=m);
 }
 
-[monIn,...mvIn].forEach(el=>el.addEventListener('input',render));
+monIn.addEventListener('input',render);
+// Move name suggestions (matches move names only; prefix matches first)
+function matchMoves(q){
+  q=q.trim().toLowerCase();if(!q)return [];
+  const pre=[],sub=[];
+  for(const m of MOVES){const n=m.name.toLowerCase();const i=n.indexOf(q);if(i===0)pre.push(m);else if(i>0)sub.push({m,w:(n[i-1]===' '||n[i-1]==='-')?0:1})}
+  sub.sort((a,b)=>a.w-b.w);
+  return pre.concat(sub.map(x=>x.m)).slice(0,12);
+}
+function hl(name,q){const i=name.toLowerCase().indexOf(q.trim().toLowerCase());if(i<0||!q.trim())return esc(name);const j=i+q.trim().length;return esc(name.slice(0,i))+'<mark>'+esc(name.slice(i,j))+'</mark>'+esc(name.slice(j))}
+mvIn.forEach((el,slot)=>{
+  const list=document.getElementById('mv'+slot+'-list');
+  let items=[],active=-1;
+  const close=()=>{list.hidden=true;el.setAttribute('aria-expanded','false');el.removeAttribute('aria-activedescendant');active=-1};
+  const setActive=i=>{active=i;[...list.children].forEach((li,k)=>li.setAttribute('aria-selected',k===i));
+    if(i>=0&&list.children[i]){el.setAttribute('aria-activedescendant',list.children[i].id);list.children[i].scrollIntoView({block:'nearest'})}else el.removeAttribute('aria-activedescendant')};
+  const pick=m=>{el.value=m.name;close();render()};
+  const open=()=>{
+    const q=el.value;items=matchMoves(q);
+    if(!q.trim()||(items.length===1&&items[0].name.toLowerCase()===q.trim().toLowerCase())){close();return}
+    list.innerHTML=items.length?items.map((m,k)=>`<li role="option" id="mv${slot}-opt${k}" aria-selected="false" data-k="${k}"><span class="nm">${hl(m.name,q)}</span>${chip(m.type)}<span class="bp">${m.power} BP</span></li>`).join(''):'<li class="none" aria-disabled="true">No move with that name</li>';
+    list.hidden=false;el.setAttribute('aria-expanded','true');setActive(items.length?0:-1);
+  };
+  el.addEventListener('input',()=>{open();render()});
+  el.addEventListener('focus',()=>{if(el.value.trim()&&!moveBy.has(el.value.trim().toLowerCase()))open()});
+  el.addEventListener('blur',()=>setTimeout(()=>{close();render()},120));
+  el.addEventListener('keydown',e=>{
+    if(list.hidden){if(e.key==='ArrowDown'&&el.value.trim()){open();e.preventDefault()}return}
+    if(e.key==='ArrowDown'){setActive(Math.min(items.length-1,active+1));e.preventDefault()}
+    else if(e.key==='ArrowUp'){setActive(Math.max(0,active-1));e.preventDefault()}
+    else if(e.key==='Enter'){if(active>=0&&items[active]){pick(items[active]);e.preventDefault()}}
+    else if(e.key==='Escape'){close();e.preventDefault()}
+    else if(e.key==='Tab'&&active>=0&&items[active]){pick(items[active])}
+  });
+  list.addEventListener('mousedown',e=>{const li=e.target.closest('li[data-k]');if(li){e.preventDefault();pick(items[+li.dataset.k])}});
+});
 document.querySelectorAll('[data-clear]').forEach(b=>b.addEventListener('click',()=>{const el=document.getElementById(b.dataset.clear);el.value='';el.focus();render()}));
 document.getElementById('reset').addEventListener('click',()=>{[monIn,...mvIn].forEach(e=>e.value='');render();monIn.focus()});
 document.getElementById('copy').addEventListener('click',async e=>{
