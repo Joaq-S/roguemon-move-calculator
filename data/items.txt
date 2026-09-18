@@ -1,0 +1,46 @@
+# Held items that raise move power. Names + effect text from pokemondb.net/item/all.
+# Multipliers are Gen 9 values (pokemondb does not list them).
+# Name|kind|arg|multiplier|effect      kind: type (arg = type letter a..r), all, super, cat (arg = p/s)
+Black Belt|type|g|1.2|Increases the power of Fighting-type moves.
+Black Glasses|type|p|1.2|Increases the power of Dark-type moves.
+Charcoal|type|b|1.2|Increases the power of Fire-type moves.
+Draco Plate|type|o|1.2|Increases power of Dragon-type moves. Changes Arceus' type to Dragon.
+Dragon Fang|type|o|1.2|Increases the power of Dragon-type moves.
+Dread Plate|type|p|1.2|Increases power of Dark-type moves. Changes Arceus' type to Dark.
+Earth Plate|type|i|1.2|Increases power of Ground-type moves. Changes Arceus' type to Ground.
+Expert Belt|super||1.2|Increases the power of super-effective moves.
+Fist Plate|type|g|1.2|Increases power of Fighting-type moves. Changes Arceus' type to Fighting.
+Flame Plate|type|b|1.2|Increases power of Fire-type moves. Changes Arceus' type to Fire.
+Hard Stone|type|m|1.2|Increases the power of Rock-type moves.
+Icicle Plate|type|f|1.2|Increases power of Ice-type moves. Changes Arceus' type to Ice.
+Insect Plate|type|l|1.2|Increases power of Bug-type moves. Changes Arceus' type to Bug.
+Iron Plate|type|q|1.2|Increases power of Steel-type moves. Changes Arceus' type to Steel.
+Life Orb|all||1.3|Increases the power of moves, but loses HP each turn.
+Magnet|type|d|1.2|Increases the power of Electric-type moves.
+Meadow Plate|type|e|1.2|Increases power of Grass-type moves. Changes Arceus' type to Grass.
+Metal Coat|type|q|1.2|Increases the power of Steel-type moves.
+Mind Plate|type|k|1.2|Increases power of Psychic-type moves. Changes Arceus' type to Psychic.
+Miracle Seed|type|e|1.2|Increases the power of Grass-type moves.
+Muscle Band|cat|p|1.1|Increases the power of Physical-category moves.
+Mystic Water|type|c|1.2|Increases the power of Water-type moves.
+Never-Melt Ice|type|f|1.2|Increases the power of Ice-type moves.
+Odd Incense|type|k|1.2|Increases the power of Psychic-type moves.
+Pixie Plate|type|r|1.2|Increases power of Fairy-type moves. Changes Arceus' type to Fairy.
+Poison Barb|type|h|1.2|Increases the power of Poison-type moves.
+Rock Incense|type|m|1.2|Increases the power of Rock-type moves.
+Rose Incense|type|e|1.2|Increases the power of Grass-type moves.
+Sea Incense|type|c|1.2|Increases the power of Water-type moves.
+Sharp Beak|type|j|1.2|Increases the power of Flying-type moves.
+Silk Scarf|type|a|1.2|Increases the power of Normal-type moves.
+Silver Powder|type|l|1.2|Increases the power of Bug-type moves.
+Sky Plate|type|j|1.2|Increases power of Flying-type moves. Changes Arceus' type to Flying.
+Soft Sand|type|i|1.2|Increases the power of Ground-type moves.
+Spell Tag|type|n|1.2|Increases the power of Ghost-type moves.
+Splash Plate|type|c|1.2|Increases power of Water-type moves. Changes Arceus' type to Water.
+Spooky Plate|type|n|1.2|Increases power of Ghost-type moves. Changes Arceus' type to Ghost.
+Stone Plate|type|m|1.2|Increases power of Rock-type moves. Changes Arceus' type to Rock.
+Toxic Plate|type|h|1.2|Increases power of Poison-type moves. Changes Arceus' type to Poison.
+Twisted Spoon|type|k|1.2|Increases the power of Psychic-type moves.
+Wave Incense|type|c|1.2|Increases the power of Water-type moves.
+Wise Glasses|cat|s|1.1|Increases the power of Special-category moves.
+Zap Plate|type|d|1.2|Increases power of Electric-type moves. Changes Arceus' type to Electric.

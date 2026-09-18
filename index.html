@@ -73,6 +73,7 @@ input[type=text].invalid{border-color:var(--bad);background:var(--bad-bg)}
 .tag{display:inline-flex;align-items:center;font:500 11px/1 var(--mono);padding:4px 6px;border-radius:4px;border:1px solid var(--line);color:var(--ink);background:var(--sunk)}
 .tag.stab{border-color:var(--accent);color:var(--accent)}
 .tag.crit{border-color:var(--bad);color:var(--bad)}
+.tag.item{border-color:var(--good);color:var(--good)}
 .hint{font-size:12px;color:var(--bad)}
 .note{font-size:12px;color:var(--muted);margin:16px 0 0;line-height:1.5}
 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:24px}
@@ -132,6 +133,13 @@ td .chip{font-size:10px;padding:3px 5px;margin-right:3px}
           <button class="clear" type="button" data-clear="mon" aria-label="Clear Pokémon">×</button>
         </div>
         <div class="meta" id="mon-meta"></div>
+        <label class="fld" for="item" style="margin-top:14px">Held item <span class="x">(optional)</span></label>
+        <div class="field">
+          <input type="text" id="item" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="item-list" autocomplete="off" spellcheck="false" placeholder="No item">
+          <button class="clear" type="button" data-clear="item" aria-label="Clear held item">×</button>
+          <ul class="sugg" id="item-list" role="listbox" aria-label="Held items" hidden></ul>
+        </div>
+        <div class="meta" id="item-meta"></div>
       </div>
       <h2>Moves</h2>
       <div class="moves" id="moves"></div>
@@ -139,7 +147,7 @@ td .chip{font-size:10px;padding:3px 5px;margin-right:3px}
         <button class="btn" type="button" id="copy">Copy share link</button>
         <button class="btn" type="button" id="reset">Clear all</button>
       </div>
-      <p class="note">Effective power = base power × type effectiveness × 1.5 if STAB × 2 if the move always crits. Abilities, items, weather and variable-power moves are not counted. Forms appear once per distinct typing.</p>
+      <p class="note">Effective power = base power × type effectiveness × 1.5 if STAB × 2 if the move always crits × held-item boost. Abilities, items, weather and variable-power moves are not counted. Forms appear once per distinct typing.</p>
     </aside>
 
     <main>
@@ -224,6 +232,15 @@ function eff(move,defTypes){
 const L=s=>TYPES['abcdefghijklmnopqr'.indexOf(s)];
 const MOVES=RM_DATA.moves.map(([name,t,power,cat,crit])=>({name,type:L(t),power,cat:cat==='p'?'Physical':'Special',crit:!!crit}));
 const MONS=RM_DATA.mons.map(([name,dex,t])=>({name,dex,types:[...t].map(L)}));
+const ITEMS=(RM_DATA.items||[]).map(([name,kind,arg,mult,effect])=>({name,kind,type:kind==='type'?L(arg):null,cat:kind==='cat'?(arg==='p'?'Physical':'Special'):null,mult,effect}));
+const itemBy=new Map(ITEMS.map(i=>[i.name.toLowerCase(),i]));
+function itemBoostLabel(it){return '×'+it.mult+' '+(it.kind==='type'?it.type:it.kind==='all'?'all moves':it.kind==='super'?'super-effective':it.cat)}
+// Item multiplier for one move hitting with effectiveness e
+function itemMult(it,move,e){if(!it)return 1;
+  if(it.kind==='type')return move.type===it.type?it.mult:1;
+  if(it.kind==='all')return it.mult;
+  if(it.kind==='cat')return move.cat===it.cat?it.mult:1;
+  if(it.kind==='super')return e>1?it.mult:1;return 1}
 const moveBy=new Map(MOVES.map(m=>[m.name.toLowerCase(),m]));
 const monBy=new Map(MONS.map(m=>[m.name.toLowerCase(),m]));
 document.getElementById('counts').textContent=MOVES.length+' moves · '+MONS.length+' Pokémon';
@@ -231,7 +248,7 @@ document.getElementById('mon-list').innerHTML=MONS.map(m=>`<option value="${esc(
 
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 const chip=t=>`<span class="chip" style="background:${COLORS[t]}">${t}</span>`;
-const fmt=n=>Number.isInteger(n)?String(n):n.toFixed(1);
+const fmt=n=>{const r=Math.round(n*10)/10;return Number.isInteger(r)?String(r):r.toFixed(1)};
 
 // Build move slots
 const movesEl=document.getElementById('moves');
@@ -241,37 +258,42 @@ for(let i=0;i<4;i++){
   <div class="meta" id="mv${i}-meta"></div></div>`);
 }
 const monIn=document.getElementById('mon');
+const itemIn=document.getElementById('item');
 const mvIn=[0,1,2,3].map(i=>document.getElementById('mv'+i));
 let sortMode='asc';
 
 function state(){
   const mon=monBy.get(monIn.value.trim().toLowerCase())||null;
   const moves=mvIn.map(el=>moveBy.get(el.value.trim().toLowerCase())||null);
-  return {mon,moves};
+  const item=itemBy.get(itemIn.value.trim().toLowerCase())||null;
+  return {mon,moves,item};
 }
 function mult(move,mon){return (move.crit?2:1)*(mon&&mon.types.includes(move.type)?1.5:1)}
 
 let lastKey=null;
 function render(){
-  const {mon,moves}=state();
+  const {mon,moves,item}=state();
   // attacker meta
   monIn.classList.toggle('invalid',!!monIn.value.trim()&&!mon);
   document.getElementById('mon-meta').innerHTML=mon?mon.types.map(chip).join('')+'<span>STAB on '+mon.types.join(' & ')+' moves</span>':(monIn.value.trim()?'<span class="hint">No Pokémon by that name. Pick one from the list.</span>':'<span>No attacker selected, so no STAB.</span>');
+  {const typing=document.activeElement===itemIn;const v=itemIn.value.trim();
+   itemIn.classList.toggle('invalid',!typing&&!!v&&!item);
+   document.getElementById('item-meta').innerHTML=item?`<span class="tag item">${esc(item.name)} ${itemBoostLabel(item)}</span><span>${esc(item.effect)}</span>`:(v&&!typing?'<span class="hint">Not a power-boosting item. Pick one from the list.</span>':'');}
   mvIn.forEach((el,i)=>{
     const m=moves[i];const typing=document.activeElement===el;el.classList.toggle('invalid',!typing&&!!el.value.trim()&&!m);
     const meta=document.getElementById('mv'+i+'-meta');
     if(m){const stab=mon&&mon.types.includes(m.type);
-      meta.innerHTML=chip(m.type)+`<span class="tag">${m.cat}</span><span class="tag">BP ${m.power}</span>`+(stab?'<span class="tag stab">STAB ×1.5</span>':'')+(m.crit?'<span class="tag crit">Always crits ×2</span>':'')+`<span class="tag">= ${fmt(m.power*mult(m,mon))}</span>`;
+      meta.innerHTML=chip(m.type)+`<span class="tag">${m.cat}</span><span class="tag">BP ${m.power}</span>`+(stab?'<span class="tag stab">STAB ×1.5</span>':'')+(m.crit?'<span class="tag crit">Always crits ×2</span>':'')+(item&&item.kind!=='super'&&itemMult(item,m,1)>1?`<span class="tag item">${esc(item.name)} ×${item.mult}</span>`:'')+(item&&item.kind==='super'?`<span class="tag item">${esc(item.name)} ×${item.mult} if super-effective</span>`:'')+`<span class="tag">= ${fmt(m.power*mult(m,mon)*itemMult(item,m,1))}</span>`;
     } else meta.innerHTML=el.value.trim()&&!typing?'<span class="hint">Not a damaging move with fixed power.</span>':'';
   });
   const active=moves.filter(Boolean);
-  const key=(mon?mon.name:'')+'|'+moves.map(m=>m?m.name:'').join('|');
+  const key=(mon?mon.name:'')+'|'+(item?item.name:'')+'|'+moves.map(m=>m?m.name:'').join('|');
   if(key===lastKey)return;
   lastKey=key;
   writeHash();
   const results=MONS.map(p=>{
     let best=null,bp=-1,be=0;
-    for(const m of active){const e=eff(m,p.types);const v=m.power*mult(m,mon)*e;if(v>bp){bp=v;best=m;be=e}}
+    for(const m of active){const e=eff(m,p.types);const v=Math.round(m.power*mult(m,mon)*e*itemMult(item,m,e)*1000)/1000;if(v>bp){bp=v;best=m;be=e}}
     return {p,best,power:active.length?bp:null,e:be};
   });
   if(!active.length){
@@ -353,6 +375,7 @@ function drawChart(vals){
 function writeHash(){
   const p=new URLSearchParams();
   if(monIn.value.trim())p.set('mon',monIn.value.trim());
+  if(itemIn.value.trim())p.set('item',itemIn.value.trim());
   const mv=mvIn.map(e=>e.value.trim());
   if(mv.some(Boolean))p.set('moves',mv.join('|'));
   const h=p.toString();
@@ -360,8 +383,9 @@ function writeHash(){
 }
 function readHash(){
   const p=new URLSearchParams(location.hash.slice(1));
-  if(!p.has('mon')&&!p.has('moves'))return false;
+  if(!p.has('mon')&&!p.has('moves')&&!p.has('item'))return false;
   monIn.value=p.get('mon')||'';
+  itemIn.value=p.get('item')||'';
   const mv=(p.get('moves')||'').split('|');
   mvIn.forEach((e,i)=>e.value=mv[i]||'');
   return true;
@@ -372,43 +396,48 @@ if(!readHash()){ // example loadout
 }
 
 monIn.addEventListener('input',render);
-// Move name suggestions (matches move names only; prefix matches first)
-function matchMoves(q){
+// Searchable dropdowns (move slots + held item). Match names only; prefix matches first.
+function rankByName(list,q,limit){
   q=q.trim().toLowerCase();if(!q)return [];
   const pre=[],sub=[];
-  for(const m of MOVES){const n=m.name.toLowerCase();const i=n.indexOf(q);if(i===0)pre.push(m);else if(i>0)sub.push({m,w:(n[i-1]===' '||n[i-1]==='-')?0:1})}
+  for(const x of list){const n=x.name.toLowerCase();const i=n.indexOf(q);if(i===0)pre.push(x);else if(i>0)sub.push({x,w:(n[i-1]===' '||n[i-1]==='-')?0:1})}
   sub.sort((a,b)=>a.w-b.w);
-  return pre.concat(sub.map(x=>x.m)).slice(0,12);
+  return pre.concat(sub.map(o=>o.x)).slice(0,limit);
 }
 function hl(name,q){const i=name.toLowerCase().indexOf(q.trim().toLowerCase());if(i<0||!q.trim())return esc(name);const j=i+q.trim().length;return esc(name.slice(0,i))+'<mark>'+esc(name.slice(i,j))+'</mark>'+esc(name.slice(j))}
-mvIn.forEach((el,slot)=>{
-  const list=document.getElementById('mv'+slot+'-list');
+function makeCombo(el,{source,known,row,empty,showAllOnFocus}){
+  const list=document.getElementById(el.getAttribute('aria-controls'));
   let items=[],active=-1;
   const close=()=>{list.hidden=true;el.setAttribute('aria-expanded','false');el.removeAttribute('aria-activedescendant');active=-1};
   const setActive=i=>{active=i;[...list.children].forEach((li,k)=>li.setAttribute('aria-selected',k===i));
     if(i>=0&&list.children[i]){el.setAttribute('aria-activedescendant',list.children[i].id);list.children[i].scrollIntoView({block:'nearest'})}else el.removeAttribute('aria-activedescendant')};
-  const pick=m=>{el.value=m.name;close();render()};
+  const pick=x=>{el.value=x.name;close();render()};
   const open=()=>{
-    const q=el.value;items=matchMoves(q);
-    if(!q.trim()||(items.length===1&&items[0].name.toLowerCase()===q.trim().toLowerCase())){close();return}
-    list.innerHTML=items.length?items.map((m,k)=>`<li role="option" id="mv${slot}-opt${k}" aria-selected="false" data-k="${k}"><span class="nm">${hl(m.name,q)}</span>${chip(m.type)}<span class="bp">${m.power} BP</span></li>`).join(''):'<li class="none" aria-disabled="true">No move with that name</li>';
-    list.hidden=false;el.setAttribute('aria-expanded','true');setActive(items.length?0:-1);
+    const q=el.value;
+    items=q.trim()?rankByName(source,q,12):(showAllOnFocus?source:[]);
+    if((!q.trim()&&!showAllOnFocus)||(q.trim()&&items.length===1&&items[0].name.toLowerCase()===q.trim().toLowerCase())){close();return}
+    list.innerHTML=items.length?items.map((x,k)=>`<li role="option" id="${el.id}-opt${k}" aria-selected="false" data-k="${k}"><span class="nm">${hl(x.name,q)}</span>${row(x)}</li>`).join(''):`<li class="none" aria-disabled="true">${empty}</li>`;
+    list.hidden=false;el.setAttribute('aria-expanded','true');setActive(items.length&&q.trim()?0:-1);
   };
   el.addEventListener('input',()=>{open();render()});
-  el.addEventListener('focus',()=>{if(el.value.trim()&&!moveBy.has(el.value.trim().toLowerCase()))open()});
+  el.addEventListener('focus',()=>{if(showAllOnFocus||(el.value.trim()&&!known(el.value)))open()});
   el.addEventListener('blur',()=>setTimeout(()=>{close();render()},120));
   el.addEventListener('keydown',e=>{
-    if(list.hidden){if(e.key==='ArrowDown'&&el.value.trim()){open();e.preventDefault()}return}
+    if(list.hidden){if(e.key==='ArrowDown'){open();e.preventDefault()}return}
     if(e.key==='ArrowDown'){setActive(Math.min(items.length-1,active+1));e.preventDefault()}
     else if(e.key==='ArrowUp'){setActive(Math.max(0,active-1));e.preventDefault()}
     else if(e.key==='Enter'){if(active>=0&&items[active]){pick(items[active]);e.preventDefault()}}
     else if(e.key==='Escape'){close();e.preventDefault()}
-    else if(e.key==='Tab'&&active>=0&&items[active]){pick(items[active])}
+    else if(e.key==='Tab'&&active>=0&&items[active]&&el.value.trim()){pick(items[active])}
   });
   list.addEventListener('mousedown',e=>{const li=e.target.closest('li[data-k]');if(li){e.preventDefault();pick(items[+li.dataset.k])}});
-});
+}
+mvIn.forEach(el=>makeCombo(el,{source:MOVES,known:v=>moveBy.has(v.trim().toLowerCase()),empty:'No move with that name',
+  row:m=>`${chip(m.type)}<span class="bp">${m.power} BP</span>`}));
+makeCombo(itemIn,{source:ITEMS,known:v=>itemBy.has(v.trim().toLowerCase()),empty:'No power-boosting item with that name',showAllOnFocus:true,
+  row:it=>`<span class="bp">${itemBoostLabel(it)}</span>`});
 document.querySelectorAll('[data-clear]').forEach(b=>b.addEventListener('click',()=>{const el=document.getElementById(b.dataset.clear);el.value='';el.focus();render()}));
-document.getElementById('reset').addEventListener('click',()=>{[monIn,...mvIn].forEach(e=>e.value='');render();monIn.focus()});
+document.getElementById('reset').addEventListener('click',()=>{[monIn,itemIn,...mvIn].forEach(e=>e.value='');render();monIn.focus()});
 document.getElementById('copy').addEventListener('click',async e=>{
   const b=e.currentTarget;try{await navigator.clipboard.writeText(location.href);b.textContent='Link copied'}catch(_){b.textContent='Copy the URL from the address bar'}
   setTimeout(()=>b.textContent='Copy share link',1800);
