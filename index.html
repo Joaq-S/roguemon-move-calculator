@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roguemon Move Calculator</title>
+<meta name="description" content="Pick up to four moves and see how hard your best one hits across every Pokémon.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#EDF0F4; --surface:#FFFFFF; --sunk:#F5F7FA; --line:#D6DCE4;
+  --ink:#16202B; --muted:#5B6877; --accent:#3446C8; --accent-ink:#FFFFFF;
+  --good:#1D7F48; --good-bg:#E3F3EA; --bad:#B8430F; --bad-bg:#FBEADF; --mid:#8A95A3;
+  --shadow:0 1px 2px rgba(22,32,43,.06),0 4px 16px rgba(22,32,43,.05);
+  --display:"Chakra Petch",ui-sans-serif,system-ui,sans-serif;
+  --body:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0F141A; --surface:#171E27; --sunk:#121820; --line:#2A3441;
+    --ink:#E6EBF0; --muted:#94A2B2; --accent:#8C9BFF; --accent-ink:#0F141A;
+    --good:#5CCB8A; --good-bg:#15301F; --bad:#F2915A; --bad-bg:#35200F; --mid:#6B7888;
+    --shadow:none; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0F141A; --surface:#171E27; --sunk:#121820; --line:#2A3441;
+  --ink:#E6EBF0; --muted:#94A2B2; --accent:#8C9BFF; --accent-ink:#0F141A;
+  --good:#5CCB8A; --good-bg:#15301F; --bad:#F2915A; --bad-bg:#35200F; --mid:#6B7888;
+  --shadow:none; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--ground);color:var(--ink);font:15px/1.5 var(--body);padding-inline:16px;padding-block:0 48px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto}
+header.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:28px 20px;border-bottom:1px solid var(--line);margin-bottom:24px}
+h1{font:700 clamp(26px,4vw,36px)/1.1 var(--display);letter-spacing:.01em;margin:0;text-wrap:balance}
+h1 span{color:var(--accent)}
+.sub{color:var(--muted);margin:6px 0 0;max-width:62ch}
+.src{font:12px var(--mono);color:var(--muted)}
+.src a{color:inherit}
+.grid{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:18px}
+h2{font:600 13px/1.2 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+label.fld{display:block;font-size:13px;font-weight:500;margin-bottom:6px}
+input[type=text]{width:100%;font:15px var(--body);color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:7px;padding:9px 34px 9px 11px}
+input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+input[type=text].invalid{border-color:var(--bad);background:var(--bad-bg)}
+.field{position:relative}
+.clear{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:6px 8px;border-radius:5px}
+.clear:hover{color:var(--ink);background:var(--line)}
+.clear:focus-visible{outline:2px solid var(--accent)}
+.attacker{padding-bottom:16px;margin-bottom:16px;border-bottom:1px dashed var(--line)}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:24px;margin-top:7px;font-size:12px;color:var(--muted)}
+.moves{display:grid;gap:14px}
+.slot-h{display:flex;justify-content:space-between;align-items:baseline}
+.slot-h .n{font:500 12px var(--mono);color:var(--muted)}
+.chip{display:inline-flex;align-items:center;font:600 11px/1 var(--body);letter-spacing:.04em;text-transform:uppercase;padding:4px 7px;border-radius:4px;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.25)}
+.tag{display:inline-flex;align-items:center;font:500 11px/1 var(--mono);padding:4px 6px;border-radius:4px;border:1px solid var(--line);color:var(--ink);background:var(--sunk)}
+.tag.stab{border-color:var(--accent);color:var(--accent)}
+.tag.crit{border-color:var(--bad);color:var(--bad)}
+.hint{font-size:12px;color:var(--bad)}
+.note{font-size:12px;color:var(--muted);margin:16px 0 0;line-height:1.5}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:24px}
+@media (max-width:640px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow)}
+.tile .k{font-size:12px;color:var(--muted);font-weight:500}
+.tile .v{font:600 clamp(28px,3.4vw,38px)/1.1 var(--display);font-variant-numeric:tabular-nums;margin-top:6px}
+.tile .d{font:12px var(--mono);color:var(--muted);margin-top:4px}
+.tile.good .v{color:var(--good)} .tile.bad .v{color:var(--bad)}
+.section{margin-bottom:24px}
+.chart-wrap{overflow-x:auto}
+svg text{font-family:var(--mono)}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:760px){.two{grid-template-columns:minmax(0,1fr)}}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{white-space:nowrap;font:500 12px var(--body);color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
+td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+td .chip{font-size:10px;padding:3px 5px;margin-right:3px}
+.pw{font-weight:600}
+.pw.good{color:var(--good)} .pw.bad{color:var(--bad)}
+.x{font:12px var(--mono);color:var(--muted)}
+.scroll{max-height:440px;overflow:auto}
+.bar{height:8px;border-radius:4px;background:var(--accent);min-width:2px}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.toolbar input{max-width:260px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{font:500 13px var(--body);border:0;background:var(--sunk);color:var(--muted);padding:7px 11px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.empty{color:var(--muted);padding:28px 8px;text-align:center}
+.btn{font:500 13px var(--body);border:1px solid var(--line);background:var(--sunk);color:var(--ink);padding:7px 11px;border-radius:7px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible{outline:2px solid var(--accent)}
+.actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+@media (prefers-reduced-motion:no-preference){.tile .v{transition:color .2s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Roguemon <span>Move</span> Calculator</h1>
+      <p class="sub">Choose your Pokémon and up to four moves. Against every Pokémon, the calculator takes your hardest-hitting move and reports how much power it lands.</p>
+    </div>
+    <div class="src">Data: <a href="https://pokemondb.net/move/all" rel="noopener">pokemondb.net</a> · <span id="counts"></span></div>
+  </header>
+
+  <div class="grid">
+    <aside class="panel" aria-label="Loadout">
+      <div class="attacker">
+        <h2>Your Pokémon</h2>
+        <label class="fld" for="mon">Attacker (for STAB)</label>
+        <div class="field">
+          <input type="text" id="mon" list="mon-list" autocomplete="off" spellcheck="false" placeholder="e.g. Garchomp">
+          <button class="clear" type="button" data-clear="mon" aria-label="Clear Pokémon">×</button>
+        </div>
+        <div class="meta" id="mon-meta"></div>
+      </div>
+      <h2>Moves</h2>
+      <div class="moves" id="moves"></div>
+      <div class="actions">
+        <button class="btn" type="button" id="copy">Copy share link</button>
+        <button class="btn" type="button" id="reset">Clear all</button>
+      </div>
+      <p class="note">Effective power = base power × type effectiveness × 1.5 if STAB × 2 if the move always crits. Abilities, items, weather and variable-power moves are not counted. Forms appear once per distinct typing.</p>
+    </aside>
+
+    <main>
+      <div class="tiles" id="tiles">
+        <div class="tile"><div class="k">Average power</div><div class="v" id="t-avg">–</div><div class="d">mean of best move</div></div>
+        <div class="tile"><div class="k">Median power</div><div class="v" id="t-med">–</div><div class="d">middle Pokémon</div></div>
+        <div class="tile good"><div class="k">Power ≥ 120</div><div class="v" id="t-hi">–</div><div class="d" id="t-hi-p">of Pokémon</div></div>
+        <div class="tile bad"><div class="k">Power &lt; 60</div><div class="v" id="t-lo">–</div><div class="d" id="t-lo-p">of Pokémon</div></div>
+      </div>
+
+      <section class="panel section">
+        <h2>Distribution of best-move power</h2>
+        <div class="chart-wrap" id="chart"></div>
+      </section>
+
+      <div class="two section">
+        <section class="panel">
+          <h2>Which move does the work</h2>
+          <div id="usage"></div>
+        </section>
+        <section class="panel">
+          <h2>Hardest to hit</h2>
+          <div id="walls"></div>
+        </section>
+      </div>
+
+      <section class="panel section">
+        <h2>Every Pokémon</h2>
+        <div class="toolbar">
+          <input type="text" id="filter" placeholder="Filter by name or type" autocomplete="off" aria-label="Filter Pokémon">
+          <div class="seg" role="group" aria-label="Sort">
+            <button type="button" data-sort="asc" aria-pressed="true">Weakest first</button>
+            <button type="button" data-sort="desc" aria-pressed="false">Strongest first</button>
+            <button type="button" data-sort="dex" aria-pressed="false">Dex order</button>
+          </div>
+        </div>
+        <div class="scroll"><table><thead><tr><th>Pokémon</th><th>Type</th><th>Best move</th><th class="num">×</th><th class="num">Power</th></tr></thead><tbody id="rows"></tbody></table></div>
+      </section>
+    </main>
+  </div>
+</div>
+<datalist id="mon-list"></datalist>
+<datalist id="move-list"></datalist>
+<script src="data.js"></script>
+<script>
+(function(){
+const TYPES=['Normal','Fire','Water','Electric','Grass','Ice','Fighting','Poison','Ground','Flying','Psychic','Bug','Rock','Ghost','Dragon','Dark','Steel','Fairy'];
+const COLORS={Normal:'#9A9A6E',Fire:'#E4692A',Water:'#4A7FE0',Electric:'#D9AD12',Grass:'#5AA63A',Ice:'#5DBDBB',Fighting:'#B33026',Poison:'#94409A',Ground:'#C9A24E',Flying:'#8C7BE0',Psychic:'#E8527F',Bug:'#8FA01C',Rock:'#AD9636',Ghost:'#6A5690',Dragon:'#6337E8',Dark:'#6B5747',Steel:'#8D8DAA',Fairy:'#D2789A'};
+// Type chart (Gen 6+): attacking type -> {super effective, not very effective, no effect}
+const CH={
+ Normal:[[],['Rock','Steel'],['Ghost']],
+ Fire:[['Grass','Ice','Bug','Steel'],['Fire','Water','Rock','Dragon'],[]],
+ Water:[['Fire','Ground','Rock'],['Water','Grass','Dragon'],[]],
+ Electric:[['Water','Flying'],['Electric','Grass','Dragon'],['Ground']],
+ Grass:[['Water','Ground','Rock'],['Fire','Grass','Poison','Flying','Bug','Dragon','Steel'],[]],
+ Ice:[['Grass','Ground','Flying','Dragon'],['Fire','Water','Ice','Steel'],[]],
+ Fighting:[['Normal','Ice','Rock','Dark','Steel'],['Poison','Flying','Psychic','Bug','Fairy'],['Ghost']],
+ Poison:[['Grass','Fairy'],['Poison','Ground','Rock','Ghost'],['Steel']],
+ Ground:[['Fire','Electric','Poison','Rock','Steel'],['Grass','Bug'],['Flying']],
+ Flying:[['Grass','Fighting','Bug'],['Electric','Rock','Steel'],[]],
+ Psychic:[['Fighting','Poison'],['Psychic','Steel'],['Dark']],
+ Bug:[['Grass','Psychic','Dark'],['Fire','Fighting','Poison','Flying','Ghost','Steel','Fairy'],[]],
+ Rock:[['Fire','Ice','Flying','Bug'],['Fighting','Ground','Steel'],[]],
+ Ghost:[['Psychic','Ghost'],['Dark'],['Normal']],
+ Dragon:[['Dragon'],['Steel'],['Fairy']],
+ Dark:[['Psychic','Ghost'],['Fighting','Dark','Fairy'],[]],
+ Steel:[['Ice','Rock','Fairy'],['Fire','Water','Electric','Steel'],[]],
+ Fairy:[['Fighting','Dragon','Dark'],['Fire','Poison','Steel'],[]]
+};
+function single(atk,def){const c=CH[atk];if(c[2].includes(def))return 0;if(c[0].includes(def))return 2;if(c[1].includes(def))return .5;return 1}
+function eff(move,defTypes){
+  let m=1;
+  for(const d of defTypes){
+    let x;
+    if(move.name==='Freeze-Dry'&&d==='Water')x=2;
+    else if(move.name==='Thousand Arrows'&&d==='Flying')x=1;
+    else{x=single(move.type,d);if(move.name==='Flying Press')x*=single('Flying',d)}
+    m*=x;
+  }
+  return m;
+}
+const L=s=>TYPES['abcdefghijklmnopqr'.indexOf(s)];
+const MOVES=RM_DATA.moves.map(([name,t,power,cat,crit])=>({name,type:L(t),power,cat:cat==='p'?'Physical':'Special',crit:!!crit}));
+const MONS=RM_DATA.mons.map(([name,dex,t])=>({name,dex,types:[...t].map(L)}));
+const moveBy=new Map(MOVES.map(m=>[m.name.toLowerCase(),m]));
+const monBy=new Map(MONS.map(m=>[m.name.toLowerCase(),m]));
+document.getElementById('counts').textContent=MOVES.length+' moves · '+MONS.length+' Pokémon';
+document.getElementById('mon-list').innerHTML=MONS.map(m=>`<option value="${esc(m.name)}">`).join('');
+document.getElementById('move-list').innerHTML=MOVES.map(m=>`<option value="${esc(m.name)}">${m.type} · ${m.power}${m.crit?' · always crits':''}</option>`).join('');
+
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+const chip=t=>`<span class="chip" style="background:${COLORS[t]}">${t}</span>`;
+const fmt=n=>Number.isInteger(n)?String(n):n.toFixed(1);
+
+// Build move slots
+const movesEl=document.getElementById('moves');
+for(let i=0;i<4;i++){
+  movesEl.insertAdjacentHTML('beforeend',`<div class="slot"><div class="slot-h"><label class="fld" for="mv${i}">Move ${i+1}</label></div>
+  <div class="field"><input type="text" id="mv${i}" list="move-list" autocomplete="off" spellcheck="false" placeholder="Search moves"><button class="clear" type="button" data-clear="mv${i}" aria-label="Clear move ${i+1}">×</button></div>
+  <div class="meta" id="mv${i}-meta"></div></div>`);
+}
+const monIn=document.getElementById('mon');
+const mvIn=[0,1,2,3].map(i=>document.getElementById('mv'+i));
+let sortMode='asc';
+
+function state(){
+  const mon=monBy.get(monIn.value.trim().toLowerCase())||null;
+  const moves=mvIn.map(el=>moveBy.get(el.value.trim().toLowerCase())||null);
+  return {mon,moves};
+}
+function mult(move,mon){return (move.crit?2:1)*(mon&&mon.types.includes(move.type)?1.5:1)}
+
+function render(){
+  const {mon,moves}=state();
+  // attacker meta
+  monIn.classList.toggle('invalid',!!monIn.value.trim()&&!mon);
+  document.getElementById('mon-meta').innerHTML=mon?mon.types.map(chip).join('')+'<span>STAB on '+mon.types.join(' & ')+' moves</span>':(monIn.value.trim()?'<span class="hint">No Pokémon by that name. Pick one from the list.</span>':'<span>No attacker selected, so no STAB.</span>');
+  mvIn.forEach((el,i)=>{
+    const m=moves[i];el.classList.toggle('invalid',!!el.value.trim()&&!m);
+    const meta=document.getElementById('mv'+i+'-meta');
+    if(m){const stab=mon&&mon.types.includes(m.type);
+      meta.innerHTML=chip(m.type)+`<span class="tag">${m.cat}</span><span class="tag">BP ${m.power}</span>`+(stab?'<span class="tag stab">STAB ×1.5</span>':'')+(m.crit?'<span class="tag crit">Always crits ×2</span>':'')+`<span class="tag">= ${fmt(m.power*mult(m,mon))}</span>`;
+    } else meta.innerHTML=el.value.trim()?'<span class="hint">Not a damaging move with fixed power.</span>':'';
+  });
+  const active=moves.filter(Boolean);
+  writeHash();
+  const results=MONS.map(p=>{
+    let best=null,bp=-1,be=0;
+    for(const m of active){const e=eff(m,p.types);const v=m.power*mult(m,mon)*e;if(v>bp){bp=v;best=m;be=e}}
+    return {p,best,power:active.length?bp:null,e:be};
+  });
+  if(!active.length){
+    ['t-avg','t-med','t-hi','t-lo'].forEach(id=>document.getElementById(id).textContent='–');
+    document.getElementById('t-hi-p').textContent=document.getElementById('t-lo-p').textContent='of Pokémon';
+    document.getElementById('chart').innerHTML='<div class="empty">Add a move to see results.</div>';
+    document.getElementById('usage').innerHTML=document.getElementById('walls').innerHTML='<div class="empty">No moves yet.</div>';
+    document.getElementById('rows').innerHTML='';lastResults=[];
+    return;
+  }
+  const vals=results.map(r=>r.power).sort((a,b)=>a-b);
+  const n=vals.length, avg=vals.reduce((a,b)=>a+b,0)/n;
+  const med=n%2?vals[(n-1)/2]:(vals[n/2-1]+vals[n/2])/2;
+  const hi=vals.filter(v=>v>=120).length, lo=vals.filter(v=>v<60).length;
+  document.getElementById('t-avg').textContent=avg.toFixed(1);
+  document.getElementById('t-med').textContent=fmt(med);
+  document.getElementById('t-hi').textContent=hi;
+  document.getElementById('t-lo').textContent=lo;
+  document.getElementById('t-hi-p').textContent=(100*hi/n).toFixed(1)+'% of '+n;
+  document.getElementById('t-lo-p').textContent=(100*lo/n).toFixed(1)+'% of '+n;
+  drawChart(vals);
+  // usage
+  const use=new Map(active.map(m=>[m.name,0]));
+  results.forEach(r=>use.set(r.best.name,(use.get(r.best.name)||0)+1));
+  const maxU=Math.max(...use.values(),1);
+  document.getElementById('usage').innerHTML='<table><thead><tr><th>Move</th><th class="num">Best vs</th><th style="width:30%"></th></tr></thead><tbody>'+
+    [...new Map(active.map(m=>[m.name,m])).values()].sort((a,b)=>use.get(b.name)-use.get(a.name)).map(m=>`<tr><td>${chip(m.type)} ${esc(m.name)}</td><td class="num">${use.get(m.name)}</td><td><div class="bar" style="width:${100*use.get(m.name)/maxU}%;background:${COLORS[m.type]}"></div></td></tr>`).join('')+'</tbody></table>';
+  // walls
+  const walls=[...results].sort((a,b)=>a.power-b.power||a.p.dex-b.p.dex).slice(0,8);
+  document.getElementById('walls').innerHTML='<table><thead><tr><th>Pokémon</th><th>Best move</th><th class="num">Power</th></tr></thead><tbody>'+
+    walls.map(r=>`<tr><td>${esc(r.p.name)}<div>${r.p.types.map(chip).join('')}</div></td><td>${esc(r.best.name)} <span class="x">×${r.e}</span></td><td class="num pw ${cls(r.power)}">${fmt(r.power)}</td></tr>`).join('')+'</tbody></table>';
+  renderRows(results);
+}
+function cls(v){return v>=120?'good':v<60?'bad':''}
+function renderRows(results){
+  const q=document.getElementById('filter').value.trim().toLowerCase();
+  let rs=results.filter(r=>!q||r.p.name.toLowerCase().includes(q)||r.p.types.some(t=>t.toLowerCase()===q));
+  if(sortMode==='asc')rs.sort((a,b)=>a.power-b.power||a.p.dex-b.p.dex);
+  else if(sortMode==='desc')rs.sort((a,b)=>b.power-a.power||a.p.dex-b.p.dex);
+  else rs.sort((a,b)=>a.p.dex-b.p.dex);
+  document.getElementById('rows').innerHTML=rs.length?rs.map(r=>`<tr><td>${esc(r.p.name)}</td><td>${r.p.types.map(chip).join('')}</td><td>${esc(r.best.name)}</td><td class="num x">${r.e}</td><td class="num pw ${cls(r.power)}">${fmt(r.power)}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">No Pokémon match that filter.</td></tr>';
+  lastResults=results;
+}
+let lastResults=[];
+
+function drawChart(vals){
+  const css=getComputedStyle(document.documentElement);
+  const C=k=>css.getPropertyValue(k).trim();
+  const max=vals[vals.length-1];
+  const w=20, top=Math.max(180,Math.ceil((max+1)/w)*w);
+  const bins=[{lo:0,hi:0,label:'0',c:0}];
+  for(let a=0;a<top;a+=w)bins.push({lo:a,hi:a+w,c:0});
+  vals.forEach(v=>{if(v===0){bins[0].c++;return}const i=Math.min(bins.length-1,1+Math.floor(v/w));bins[i].c++});
+  const W=Math.max(560,bins.length*30), H=256, pl=40, pr=10, pt=30, pb=40;
+  const iw=W-pl-pr, ih=H-pt-pb, bw=iw/bins.length;
+  const maxC=Math.max(...bins.map(b=>b.c));
+  const step=maxC>400?100:maxC>200?50:maxC>80?20:maxC>30?10:5;
+  const yTop=Math.ceil(maxC/step)*step||step;
+  const y=v=>pt+ih-ih*v/yTop;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:${Math.min(W,560)}px;display:block" role="img" aria-label="Histogram of best-move power across Pokémon">`;
+  for(let v=0;v<=yTop;v+=step){s+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="${C('--line')}" stroke-width="1"/><text x="${pl-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="${C('--muted')}">${v}</text>`}
+  bins.forEach((b,i)=>{
+    const x=pl+i*bw+2, h=ih*b.c/yTop;
+    const col=i===0||b.hi<=60?C('--bad'):b.lo>=120?C('--good'):C('--mid');
+    if(b.c)s+=`<rect x="${x}" y="${y(b.c)}" width="${bw-4}" height="${h}" rx="2" fill="${col}"><title>${i===0?'Immune (0)':b.lo+'–'+(b.hi-0.1)}: ${b.c} Pokémon</title></rect>`;
+    if(b.c&&bw>22)s+=`<text x="${x+(bw-4)/2}" y="${y(b.c)-4}" text-anchor="middle" font-size="10" fill="${C('--muted')}">${b.c}</text>`;
+    const lab=i===0?'×0':(i%2===1&&i>1?String(b.lo):'');
+    if(lab)s+=`<text x="${i===0?x+(bw-4)/2:pl+i*bw}" y="${H-pb+16}" text-anchor="middle" font-size="11" fill="${C('--muted')}">${lab}</text>`;
+  });
+  [60,120].forEach(t=>{const x=pl+(1+t/w)*bw;s+=`<line x1="${x}" x2="${x}" y1="${pt-18}" y2="${pt+ih}" stroke="${C('--ink')}" stroke-dasharray="3 3" stroke-width="1"/><text x="${x+4}" y="${pt-10}" font-size="11" fill="${C('--ink')}">${t}</text>`});
+  s+=`<text x="${pl+iw/2}" y="${H-6}" text-anchor="middle" font-size="11" fill="${C('--muted')}">best-move power (×0 = immune)</text></svg>`;
+  document.getElementById('chart').innerHTML=s;
+}
+
+// URL hash state
+function writeHash(){
+  const p=new URLSearchParams();
+  if(monIn.value.trim())p.set('mon',monIn.value.trim());
+  const mv=mvIn.map(e=>e.value.trim());
+  if(mv.some(Boolean))p.set('moves',mv.join('|'));
+  const h=p.toString();
+  history.replaceState(null,'',h?'#'+h:location.pathname+location.search);
+}
+function readHash(){
+  const p=new URLSearchParams(location.hash.slice(1));
+  if(!p.has('mon')&&!p.has('moves'))return false;
+  monIn.value=p.get('mon')||'';
+  const mv=(p.get('moves')||'').split('|');
+  mvIn.forEach((e,i)=>e.value=mv[i]||'');
+  return true;
+}
+if(!readHash()){ // example loadout
+  monIn.value='Pikachu';
+  ['Thunderbolt','Iron Tail','Quick Attack','Brick Break'].forEach((m,i)=>mvIn[i].value=m);
+}
+
+[monIn,...mvIn].forEach(el=>el.addEventListener('input',render));
+document.querySelectorAll('[data-clear]').forEach(b=>b.addEventListener('click',()=>{const el=document.getElementById(b.dataset.clear);el.value='';el.focus();render()}));
+document.getElementById('reset').addEventListener('click',()=>{[monIn,...mvIn].forEach(e=>e.value='');render();monIn.focus()});
+document.getElementById('copy').addEventListener('click',async e=>{
+  const b=e.currentTarget;try{await navigator.clipboard.writeText(location.href);b.textContent='Link copied'}catch(_){b.textContent='Copy the URL from the address bar'}
+  setTimeout(()=>b.textContent='Copy share link',1800);
+});
+document.getElementById('filter').addEventListener('input',()=>renderRows(lastResults));
+document.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{
+  sortMode=b.dataset.sort;document.querySelectorAll('[data-sort]').forEach(x=>x.setAttribute('aria-pressed',x===b));renderRows(lastResults);
+}));
+window.addEventListener('hashchange',()=>{readHash();render()});
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',render);
+render();
+})();
+</script>
+</body>
+</html>
