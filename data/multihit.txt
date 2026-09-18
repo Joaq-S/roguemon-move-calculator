@@ -1,0 +1,39 @@
+# Multi-hit moves: power is multiplied by `factor` (expected total power ÷ base power).
+# Hit counts from pokemondb.net/move/all effect text + Gen 9 rules (RM-4).
+# Name|factor|label shown in the UI
+Bonemerang|2|2 hits
+Double Hit|2|2 hits
+Double Iron Bash|2|2 hits
+Double Kick|2|2 hits
+Dragon Darts|2|2 hits
+Dual Chop|2|2 hits
+Dual Wingbeat|2|2 hits
+Gear Grind|2|2 hits
+Tachyon Cutter|2|2 hits
+Twin Beam|2|2 hits
+Twineedle|2|2 hits
+Surging Strikes|3|3 hits
+Triple Dive|3|3 hits
+# 2-5 hits, Gen 9 odds 35/35/15/15% -> average 3.1 hits
+Arm Thrust|3.1|avg 3.1 hits (2–5)
+Barrage|3.1|avg 3.1 hits (2–5)
+Bone Rush|3.1|avg 3.1 hits (2–5)
+Bullet Seed|3.1|avg 3.1 hits (2–5)
+Comet Punch|3.1|avg 3.1 hits (2–5)
+Double Slap|3.1|avg 3.1 hits (2–5)
+Fury Attack|3.1|avg 3.1 hits (2–5)
+Fury Swipes|3.1|avg 3.1 hits (2–5)
+Icicle Spear|3.1|avg 3.1 hits (2–5)
+Pin Missile|3.1|avg 3.1 hits (2–5)
+Rock Blast|3.1|avg 3.1 hits (2–5)
+Scale Shot|3.1|avg 3.1 hits (2–5)
+Spike Cannon|3.1|avg 3.1 hits (2–5)
+Tail Slap|3.1|avg 3.1 hits (2–5)
+Water Shuriken|3.1|avg 3.1 hits (2–5)
+# Each hit rolls 90% accuracy; the move stops at the first miss (expected value).
+# Population Bomb: 20 BP x sum(0.9^k, k=1..10) = 20 x 5.8619 = 117.24
+Population Bomb|5.861894039|exp. 5.86 hits (1–10, 90% each)
+# Triple Kick: 10x0.9 + 20x0.81 + 30x0.729 = 47.07  (factor vs 10 BP)
+Triple Kick|4.707|exp. 47.07 BP (10/20/30, 90% each)
+# Triple Axel: 20x0.9 + 40x0.81 + 60x0.729 = 94.14  (factor vs 20 BP)
+Triple Axel|4.707|exp. 94.14 BP (20/40/60, 90% each)

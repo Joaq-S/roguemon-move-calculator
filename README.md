@@ -8,7 +8,8 @@ hardest-hitting move and reports:
 - how many Pokémon take power ≥ 120
 - how many Pokémon take power < 60
 
-**Effective power** = base power × type effectiveness × 1.5 (STAB, if the move matches your
+**Effective power** = base power × hits (multi-hit moves: fixed count, 3.1 average for 2–5 hits,
+expected hits for Population Bomb / Triple Kick / Triple Axel; see `data/multihit.txt`) × type effectiveness × 1.5 (STAB, if the move matches your
 Pokémon's type) × 2 (if the move always lands a critical hit: Flower Trick, Frost Breath,
 Storm Throw, Surging Strikes, Wicked Blow, Zippy Zap) × held-item boost (optional; Gen 9 values:
 type items, Plates and incenses ×1.2, Life Orb ×1.3, Expert Belt ×1.2 on super-effective hits,
@@ -25,7 +26,7 @@ once per distinct typing.
 |---|---|
 | `index.html` | The page |
 | `data.js` | Move + Pokémon data used by the page (generated) |
-| `data/moves.txt`, `data/pokemon_raw.txt`, `data/items.txt` | Raw extracts from pokemondb.net (`/move/all`, `/pokedex/all`, `/item/all`) |
+| `data/moves.txt`, `data/pokemon_raw.txt`, `data/items.txt`, `data/multihit.txt` | Raw extracts from pokemondb.net (`/move/all`, `/pokedex/all`, `/item/all`) |
 | `data/build_data.py` | Rebuilds `data.js` from the raw extracts: `python3 data/build_data.py` |
 
 ## Publish on GitHub Pages

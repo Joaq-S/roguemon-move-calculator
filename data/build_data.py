@@ -18,6 +18,18 @@ moves = []
 for e in (here/"moves.txt").read_text().strip().split(";"):
     p = e.split("|")
     moves.append([p[0], p[1], int(p[2]), p[3], 1 if len(p) > 4 else 0])
+multi = {}
+for line in (here/"multihit.txt").read_text(encoding="utf-8").splitlines():
+    if not line.strip() or line.startswith("#"):
+        continue
+    name, factor, label = line.split("|", 2)
+    multi[name] = [float(factor), label]
+names = {m[0] for m in moves}
+missing = set(multi) - names
+assert not missing, f"multihit.txt names not in moves.txt: {missing}"
+for m in moves:
+    if m[0] in multi:
+        m.extend(multi[m[0]])
 mons = []
 for e in (here/"pokemon_raw.txt").read_text().strip().split(";"):
     label, num, types = e.split("|")

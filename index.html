@@ -56,7 +56,7 @@ input[type=text].invalid{border-color:var(--bad);background:var(--bad-bg)}
 .sugg li{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:5px;cursor:pointer}
 .sugg li .nm{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sugg li .nm mark{background:none;color:var(--accent);font-weight:600}
-.sugg li .bp{font:12px var(--mono);color:var(--muted);min-width:44px;text-align:right}
+.sugg li .bp{font:12px var(--mono);color:var(--muted);min-width:44px;text-align:right;white-space:nowrap}
 .sugg li .chip{font-size:10px;padding:3px 5px}
 .sugg li[aria-selected="true"],.sugg li:hover{background:var(--sunk)}
 .sugg li[aria-selected="true"]{outline:1px solid var(--accent)}
@@ -74,6 +74,7 @@ input[type=text].invalid{border-color:var(--bad);background:var(--bad-bg)}
 .tag.stab{border-color:var(--accent);color:var(--accent)}
 .tag.crit{border-color:var(--bad);color:var(--bad)}
 .tag.item{border-color:var(--good);color:var(--good)}
+.tag.hits{border-color:var(--ink);font-weight:500}
 .hint{font-size:12px;color:var(--bad)}
 .note{font-size:12px;color:var(--muted);margin:16px 0 0;line-height:1.5}
 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:24px}
@@ -147,7 +148,7 @@ td .chip{font-size:10px;padding:3px 5px;margin-right:3px}
         <button class="btn" type="button" id="copy">Copy share link</button>
         <button class="btn" type="button" id="reset">Clear all</button>
       </div>
-      <p class="note">Effective power = base power × type effectiveness × 1.5 if STAB × 2 if the move always crits × held-item boost. Abilities, items, weather and variable-power moves are not counted. Forms appear once per distinct typing.</p>
+      <p class="note">Effective power = base power × type effectiveness × number of hits (average or expected for variable multi-hit moves) × 1.5 if STAB × 2 if the move always crits × held-item boost. Abilities, items, weather and variable-power moves are not counted. Forms appear once per distinct typing.</p>
     </aside>
 
     <main>
@@ -230,7 +231,7 @@ function eff(move,defTypes){
   return m;
 }
 const L=s=>TYPES['abcdefghijklmnopqr'.indexOf(s)];
-const MOVES=RM_DATA.moves.map(([name,t,power,cat,crit])=>({name,type:L(t),power,cat:cat==='p'?'Physical':'Special',crit:!!crit}));
+const MOVES=RM_DATA.moves.map(([name,t,power,cat,crit,hits,hitsLabel])=>({name,type:L(t),power,cat:cat==='p'?'Physical':'Special',crit:!!crit,hits:hits||1,hitsLabel:hitsLabel||''}));
 const MONS=RM_DATA.mons.map(([name,dex,t])=>({name,dex,types:[...t].map(L)}));
 const ITEMS=(RM_DATA.items||[]).map(([name,kind,arg,mult,effect])=>({name,kind,type:kind==='type'?L(arg):null,cat:kind==='cat'?(arg==='p'?'Physical':'Special'):null,mult,effect}));
 const itemBy=new Map(ITEMS.map(i=>[i.name.toLowerCase(),i]));
@@ -268,7 +269,7 @@ function state(){
   const item=itemBy.get(itemIn.value.trim().toLowerCase())||null;
   return {mon,moves,item};
 }
-function mult(move,mon){return (move.crit?2:1)*(mon&&mon.types.includes(move.type)?1.5:1)}
+function mult(move,mon){return move.hits*(move.crit?2:1)*(mon&&mon.types.includes(move.type)?1.5:1)}
 
 let lastKey=null;
 function render(){
@@ -283,7 +284,7 @@ function render(){
     const m=moves[i];const typing=document.activeElement===el;el.classList.toggle('invalid',!typing&&!!el.value.trim()&&!m);
     const meta=document.getElementById('mv'+i+'-meta');
     if(m){const stab=mon&&mon.types.includes(m.type);
-      meta.innerHTML=chip(m.type)+`<span class="tag">${m.cat}</span><span class="tag">BP ${m.power}</span>`+(stab?'<span class="tag stab">STAB ×1.5</span>':'')+(m.crit?'<span class="tag crit">Always crits ×2</span>':'')+(item&&item.kind!=='super'&&itemMult(item,m,1)>1?`<span class="tag item">${esc(item.name)} ×${item.mult}</span>`:'')+(item&&item.kind==='super'?`<span class="tag item">${esc(item.name)} ×${item.mult} if super-effective</span>`:'')+`<span class="tag">= ${fmt(m.power*mult(m,mon)*itemMult(item,m,1))}</span>`;
+      meta.innerHTML=chip(m.type)+`<span class="tag">${m.cat}</span><span class="tag">BP ${m.power}</span>`+(m.hits!==1?`<span class="tag hits" title="${esc(m.hitsLabel)}">×${+m.hits.toFixed(3)} · ${esc(m.hitsLabel)}</span>`:'')+(stab?'<span class="tag stab">STAB ×1.5</span>':'')+(m.crit?'<span class="tag crit">Always crits ×2</span>':'')+(item&&item.kind!=='super'&&itemMult(item,m,1)>1?`<span class="tag item">${esc(item.name)} ×${item.mult}</span>`:'')+(item&&item.kind==='super'?`<span class="tag item">${esc(item.name)} ×${item.mult} if super-effective</span>`:'')+`<span class="tag">= ${fmt(m.power*mult(m,mon)*itemMult(item,m,1))}</span>`;
     } else meta.innerHTML=el.value.trim()&&!typing?'<span class="hint">Not a damaging move with fixed power.</span>':'';
   });
   const active=moves.filter(Boolean);
@@ -433,7 +434,7 @@ function makeCombo(el,{source,known,row,empty,showAllOnFocus}){
   list.addEventListener('mousedown',e=>{const li=e.target.closest('li[data-k]');if(li){e.preventDefault();pick(items[+li.dataset.k])}});
 }
 mvIn.forEach(el=>makeCombo(el,{source:MOVES,known:v=>moveBy.has(v.trim().toLowerCase()),empty:'No move with that name',
-  row:m=>`${chip(m.type)}<span class="bp">${m.power} BP</span>`}));
+  row:m=>`${chip(m.type)}<span class="bp">${m.power} BP${m.hits!==1?' ×'+(+m.hits.toFixed(2)):''}</span>`}));
 makeCombo(itemIn,{source:ITEMS,known:v=>itemBy.has(v.trim().toLowerCase()),empty:'No power-boosting item with that name',showAllOnFocus:true,
   row:it=>`<span class="bp">${itemBoostLabel(it)}</span>`});
 document.querySelectorAll('[data-clear]').forEach(b=>b.addEventListener('click',()=>{const el=document.getElementById(b.dataset.clear);el.value='';el.focus();render()}));
